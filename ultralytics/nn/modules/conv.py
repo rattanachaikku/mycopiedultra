@@ -22,6 +22,7 @@ __all__ = (
     "Concat",
     "RepConv",
     "Index",
+    "Stem",
 )
 
 
@@ -712,3 +713,27 @@ class Index(nn.Module):
             (torch.Tensor): Selected tensor.
         """
         return x[self.index]
+class Stem(nn.Module):
+    def __init__(self, c1, c2, kernel_size=3, stride=2, padding=1, w=1):
+        super().__init__()
+        self.cbs1 = Conv(c1, c2, kernel_size=3, stride=2, padding=1)
+        self.cbs2 = Conv(c2, c2*2, kernel_size=3, stride=2, padding=1)  # Changed stride to 1
+
+        self.cbs3 = Conv(c2*2, out_channels=c2, kernel_size=3, stride=1, padding=1)  # Changed stride to 1
+
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.cbs4 = Conv(c2+c2, c2, kernel_size=3, stride=2, padding=1)
+
+    def forward(self, x):
+        cbs1_output = self.cbs1(x)  # [1, out_channels, 320, 320]
+        cbs2_output = self.cbs2(cbs1_output)  # [1, out_channels*2, 320, 320]
+        cbs3_output = self.cbs3(cbs2_output)  # [1, out_channels, 320, 320]
+
+     
+        maxpool_output = self.maxpool(cbs1_output)  # [1, out_channels, 160, 160]
+    
+        concatenated_output = torch.cat([cbs3_output, maxpool_output], dim=1)  # [1, 2*out_channels, 160, 160]
+       
+        output = self.cbs4(concatenated_output)  # [1, out_channels, 80, 80]
+    
+        return output
