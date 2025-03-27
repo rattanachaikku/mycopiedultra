@@ -149,7 +149,7 @@ class Stem(nn.Module):
         self.cbs3 = Conv(c2*2, out_channels=c2, kernel_size=3, stride=1, padding=1)  # Changed stride to 1
 
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.cbs4 = Conv(c2+c2), c2, kernel_size=3, stride=2, padding=1)
+        self.cbs4 = Conv(c2+c2, c2, kernel_size=3, stride=2, padding=1)
 
     def forward(self, x):
         cbs1_output = self.cbs1(x)  # [1, out_channels, 320, 320]
