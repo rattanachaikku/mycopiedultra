@@ -53,8 +53,7 @@ __all__ = (
     "Stem",
     "RCC",
     "MaxpoolRCC", 
-    "MaxpoolCbs"
-    
+    "MaxpoolCbs",
 )
 
 
