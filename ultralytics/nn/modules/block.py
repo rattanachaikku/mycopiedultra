@@ -50,6 +50,11 @@ __all__ = (
     "PSA",
     "SCDown",
     "TorchVision",
+    "Stem",
+    "RCC",
+    "MaxpoolRCC", 
+    "MaxpoolCbs"
+    
 )
 
 
@@ -134,6 +139,35 @@ class HGStem(nn.Module):
         x = self.stem3(x)
         x = self.stem4(x)
         return x
+    
+class Stem(nn.Module):
+    def __init__(self, c1, c2, kernel_size=3, stride=2, padding=1, w=1):
+        super().__init__()
+        self.cbs1 = Conv(c1, c2, kernel_size=3, stride=2, padding=1)
+        self.cbs2 = Conv(c2, c2*2, kernel_size=3, stride=2, padding=1)  # Changed stride to 1
+
+        self.cbs3 = Conv(c2*2, out_channels=c2, kernel_size=3, stride=1, padding=1)  # Changed stride to 1
+
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.cbs4 = Conv(c2+c2), c2, kernel_size=3, stride=2, padding=1)
+
+    def forward(self, x):
+        cbs1_output = self.cbs1(x)  # [1, out_channels, 320, 320]
+        cbs2_output = self.cbs2(cbs1_output)  # [1, out_channels*2, 320, 320]
+        cbs3_output = self.cbs3(cbs2_output)  # [1, out_channels, 320, 320]
+
+     
+        maxpool_output = self.maxpool(cbs1_output)  # [1, out_channels, 160, 160]
+    
+        concatenated_output = torch.cat([cbs3_output, maxpool_output], dim=1)  # [1, 2*out_channels, 160, 160]
+       
+        output = self.cbs4(concatenated_output)  # [1, out_channels, 80, 80]
+    
+        return output
+
+
+
+
 
 
 class HGBlock(nn.Module):
@@ -1859,3 +1893,62 @@ class A2C2f(nn.Module):
         if self.gamma is not None:
             return x + self.gamma.view(-1, len(self.gamma), 1, 1) * y
         return y
+    
+
+class NewResNetBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1, shortcut=True):
+        super().__init__()
+        self.conv1 = Conv(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2 = Conv(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv3 = Conv(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.shortcut = shortcut
+
+    def forward(self, x):
+        identity = x
+        out = self.conv1(x)
+
+        out = self.conv2(out)
+        out = self.conv3(out)
+        if self.shortcut:
+            out += identity
+        return (out)
+class RCC(nn.Module):
+    def __init__(self,c1, c2, shortcut=True):
+        super().__init__()
+        self.conv1 = Conv(c1, out_channels=c2//2, kernel_size=1, stride=1, padding=0)
+        self.res_net = NewResNetBlock(in_channels=c2//2, out_channels=c2//2,stride=1, shortcut=shortcut)
+        self.conv2 = Conv( (c2+c2)//2, c2, kernel_size=1, stride=1, padding=0)
+
+    def forward(self, x):
+
+        out = self.conv1(x)
+
+        out1 = self.res_net(out)
+
+        out2 = torch.cat([out, out1], dim=1)
+
+        out2 = self.conv2(out2)
+
+        return (out2)
+class MaxpoolRCC(nn.Module):
+    def __init__(self,c1, c2, shortcut=True):
+        super().__init__()
+        self.m1 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        self.rcc = RCC(c1,c2)
+    
+    def forward(self, x):
+        out = self.m1(x)
+        out = self.rcc(out)
+
+        return out
+class MaxpoolCbs(nn.Module):
+    def __init__(self,c1,c2):
+        self.m3 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
+        self.blackbone_cbs = Conv(c1, c2)
+    def forward(self,x):
+        out = self.m3(x)
+
+        x = self.blackbone_cbs(out)
+        return x
+
+        
